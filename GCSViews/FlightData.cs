@@ -770,6 +770,75 @@ namespace MissionPlanner.GCSViews
             };
         }
 
+        private void CustomGauge_DoubleClick(object sender, EventArgs e)
+        {
+            var oldGauge = sender as AGauge;
+            if (oldGauge == null)
+                return;
+
+            string max = oldGauge.MaxValue.ToString();
+
+            if (DialogResult.OK != InputBox.Show(
+                "Enter Max Value",
+                "Enter Max Value",
+                ref max))
+                return;
+
+            if (!float.TryParse(max, out float newMax))
+                return;
+
+            string binding = oldGauge.Name.Replace("gauge_", "");
+            string caption = oldGauge.CapText;
+
+            int index = _customGauges.IndexOf(oldGauge);
+
+            CurrentState.custom_field_names[binding] = caption;
+
+            _customGauges.Remove(oldGauge);
+            tabGauges.Controls.Remove(oldGauge);
+            oldGauge.Dispose();
+
+            var g = CreateCustomGauge(caption, binding, 0, newMax);
+
+            float step;
+            if (newMax <= 200) step = 20;
+            else if (newMax <= 500) step = 50;
+            else if (newMax <= 1000) step = 100;
+            else if (newMax <= 2000) step = 200;
+            else if (newMax <= 5000) step = 500;
+            else step = 1000;
+
+            g.ScaleLinesMajorStepValue = step;
+            g.ScaleLinesMinorNumOf = 10;
+
+            // int arc = g.BaseArcRadius;
+
+            // if (newMax <= 1000)
+            //     g.ScaleNumbersRadius = arc - 20;
+            // else if (newMax <= 5000)
+            //     g.ScaleNumbersRadius = arc - 16;
+            // else
+            //     g.ScaleNumbersRadius = arc - 12;
+
+            // g.ScaleLinesMajorInnerRadius = arc - 22;
+            // g.ScaleLinesMajorOuterRadius = arc - 6;
+            // g.ScaleLinesMinorInnerRadius = arc - 16;
+            // g.ScaleLinesMinorOuterRadius = arc - 6;
+
+            if (index >= 0 && index <= _customGauges.Count)
+                _customGauges.Insert(index, g);
+            else
+                _customGauges.Add(g);
+
+            tabGauges.Controls.Add(g);
+            tabGauges.Controls.SetChildIndex(g, index); 
+
+            tabPage1_Resize(tabGauges, EventArgs.Empty);
+
+            Settings.Instance[g.Name + "_MAX"]  = newMax.ToString();
+            Settings.Instance[g.Name + "_STEP"] = step.ToString();
+        }
+
         private AGauge CreateCustomGauge(
             string caption,
             string bindingProperty,
@@ -882,7 +951,22 @@ namespace MissionPlanner.GCSViews
 
             // ===== МІН / МАКС =====
             g.MinValue = minValue;
-            g.MaxValue = maxValue;
+
+            string keyMax = "gauge_" + bindingProperty + "_MAX";
+
+            if (Settings.Instance[keyMax] != null &&
+                float.TryParse(Settings.Instance[keyMax], out float savedMax))
+            {
+                g.MaxValue = savedMax;
+                g.ScaleLinesMajorStepValue = savedMax / 10f;
+                g.ScaleLinesMinorNumOf = 10;
+            }
+            else
+            {
+                g.MaxValue = maxValue;
+                g.ScaleLinesMajorStepValue = maxValue / 10f;
+                g.ScaleLinesMinorNumOf = 10;
+            }
 
             try
             {
@@ -917,6 +1001,8 @@ namespace MissionPlanner.GCSViews
 
             g.Name = "gauge_" + bindingProperty;
             _customGauges.Add(g);
+
+            g.DoubleClick += CustomGauge_DoubleClick;
 
             return g;
         }
@@ -1115,8 +1201,8 @@ namespace MissionPlanner.GCSViews
 
             foreach (var g in _customGauges)
             {
-                if (g.Parent == null)
-                    tabGauges.Controls.Add(g);   
+                if (g != null && g.Parent != tabGauges)
+                    tabGauges.Controls.Add(g);
             }
 
             int x = 0;
