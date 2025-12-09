@@ -198,6 +198,7 @@ namespace MissionPlanner.GCSViews
             Engine_Start,
             Engine_Stop,
             Terminate_Flight,
+            Format_SD_Card,
         }
 
         private Dictionary<int, string> NIC_table = new Dictionary<int, string>()
@@ -423,6 +424,8 @@ namespace MissionPlanner.GCSViews
 
         }
 
+        
+        
         public void Activate()
         {
             log.Info("Activate Called");
@@ -1668,6 +1671,24 @@ namespace MissionPlanner.GCSViews
 
         private void BUTactiondo_Click(object sender, EventArgs e)
         {
+
+
+            if (CMB_action.Text == actions.Format_SD_Card.ToString())
+            {
+                 try
+                {
+                    //p1 and p2 must be 1 to initate SD card format
+                    MainV2.comPort.doCommandInt(MainV2.comPort.MAV.sysid, MainV2.comPort.MAV.compid, MAVLink.MAV_CMD.STORAGE_FORMAT, 1, 1, 0, 0, 0, 0, 0);
+                    return;
+                }
+                catch
+                {
+                    CustomMessageBox.Show(Strings.CommandFailed, Strings.ERROR);
+                    return;
+                }
+            }
+
+
             try
             {
                 if (CMB_action.Text == actions.Trigger_Camera.ToString())
@@ -5950,6 +5971,67 @@ namespace MissionPlanner.GCSViews
             {
                 CustomMessageBox.Show(Strings.InvalidField, Strings.ERROR);
             }
+        }
+
+        private void OpirPlaneHere_Click(object sender, EventArgs e)
+        {
+            string coords = string.Format(
+                CultureInfo.InvariantCulture,
+                "{0};{1}",
+                MouseDownStart.Lat,
+                MouseDownStart.Lng);
+
+            
+            InputBox.Show(
+                "OPIR target coords",
+                "Enter coords 'lat;long'",
+                ref coords);
+
+            var split = coords.Split(';');
+
+            if (split.Length < 2)
+            {
+                CustomMessageBox.Show(Strings.InvalidField, Strings.ERROR);
+                return;
+            }
+
+            float lat;
+            float lng;
+
+            try
+            {
+                lat = float.Parse(split[0], CultureInfo.InvariantCulture);
+                lng = float.Parse(split[1], CultureInfo.InvariantCulture);
+            }
+            catch
+            {
+                CustomMessageBox.Show(Strings.InvalidField, Strings.ERROR);
+                return;
+            }
+
+            var port = MainV2.comPort;
+            if (port == null || port.BaseStream == null || !port.BaseStream.IsOpen)
+            {
+                CustomMessageBox.Show("No MAVLink connection", Strings.ERROR);
+                return;
+            }
+
+            var cmd = new MAVLink.mavlink_command_long_t
+            {
+                target_system    = (byte)port.MAV.sysid,
+                target_component = 170,      // модуль
+                command          = 102,      
+                confirmation     = 0,
+                param1           = 5,        // 5 – "OPIR coordinates from user"
+                param2           = lat,      // Latitude
+                param3           = lng,      // Longitude
+                param4           = 0,
+                param5           = 0,
+                param6           = 0,
+                param7           = 0
+            };
+
+            port.sendPacket(cmd, cmd.target_system, cmd.target_component);
         }
 
         private void poiatcoordsToolStripMenuItem_Click(object sender, EventArgs e)

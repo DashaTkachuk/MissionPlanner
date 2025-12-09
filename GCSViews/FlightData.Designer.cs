@@ -2511,6 +2511,13 @@ namespace MissionPlanner.GCSViews
             this.zg1.ScrollMinY = 0D;
             this.zg1.ScrollMinY2 = 0D;
             this.zg1.DoubleClick += new System.EventHandler(this.zg1_DoubleClick);
+
+            // opirPlaneHereToolStripMenuItem
+            this.opirPlaneHereToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            resources.ApplyResources(this.opirPlaneHereToolStripMenuItem, "opirPlaneHereToolStripMenuItem");
+            this.opirPlaneHereToolStripMenuItem.Name = "opirPlaneHereToolStripMenuItem";
+            this.opirPlaneHereToolStripMenuItem.Text = "Plane is here";
+            this.opirPlaneHereToolStripMenuItem.Click += new System.EventHandler(this.OpirPlaneHere_Click);
             // 
             // contextMenuStripMap
             // 
@@ -2518,6 +2525,7 @@ namespace MissionPlanner.GCSViews
             this.goHereToolStripMenuItem,
             this.flyToHereAltToolStripMenuItem,
             this.flyToCoordsToolStripMenuItem,
+            this.opirPlaneHereToolStripMenuItem,
             this.addPoiToolStripMenuItem,
             this.pointCameraHereToolStripMenuItem,
             this.PointCameraCoordsToolStripMenuItem1,
@@ -2548,7 +2556,7 @@ namespace MissionPlanner.GCSViews
             this.flyToCoordsToolStripMenuItem.Name = "flyToCoordsToolStripMenuItem";
             resources.ApplyResources(this.flyToCoordsToolStripMenuItem, "flyToCoordsToolStripMenuItem");
             this.flyToCoordsToolStripMenuItem.Click += new System.EventHandler(this.flyToCoordsToolStripMenuItem_Click);
-            // 
+            //
             // addPoiToolStripMenuItem
             // 
             this.addPoiToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
@@ -3036,6 +3044,7 @@ namespace MissionPlanner.GCSViews
         private System.Windows.Forms.ToolStripMenuItem flyToHereAltToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem flightPlannerToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem userItemsToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem opirPlaneHereToolStripMenuItem;
         //private Crom.Controls.Docking.DockContainer dockContainer1;
         private Controls.MyButton BUT_ARM;
         private Controls.ModifyandSet modifyandSetAlt;
