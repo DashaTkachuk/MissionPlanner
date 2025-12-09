@@ -4,6 +4,8 @@ using GMap.NET;
 using GMap.NET.WindowsForms;
 using GMap.NET.WindowsForms.Markers;
 using log4net;
+using AGaugeApp;
+using System.Collections;
 using Microsoft.Scripting.Utils;
 using MissionPlanner.ArduPilot;
 using MissionPlanner.Controls;
@@ -239,6 +241,7 @@ namespace MissionPlanner.GCSViews
             log.Info("Ctor Start");
 
             InitializeComponent();
+            InitGaugesContextMenu(); 
 
             log.Info("Components Done");
 
@@ -423,9 +426,7 @@ namespace MissionPlanner.GCSViews
             tabControlactions.Multiline = Settings.Instance.GetBoolean("tabControlactions_Multiline", false);
 
         }
-
-        
-        
+ 
         public void Activate()
         {
             log.Info("Activate Called");
@@ -724,6 +725,418 @@ namespace MissionPlanner.GCSViews
             TabListDisplay.Add(tabAuxFunction.Name, MainV2.DisplayConfiguration.displayAuxFunctionTab);
 
             TabListDisplay.Add(tabPayload.Name, MainV2.DisplayConfiguration.displayPayloadTab);
+        }
+
+        private ContextMenuStrip _gaugesContextMenu;
+        private readonly List<AGauge> _customGauges = new List<AGauge>();
+
+        private void InitGaugesContextMenu()
+        {
+            _gaugesContextMenu = new ContextMenuStrip();
+
+            var addItem = new ToolStripMenuItem("Add gauge");
+            addItem.Click += (s, e) =>
+            {
+                ShowGaugeParamSelectForm();
+            };
+
+            var clearItem = new ToolStripMenuItem("Remove all custom gauges");
+            clearItem.Click += (s, e) =>
+            {
+                foreach (var g in _customGauges.ToList())
+                {
+                    if (g?.Parent != null)
+                        g.Parent.Controls.Remove(g);
+
+                    g?.Dispose();
+                }
+
+                _customGauges.Clear();
+
+                if (hud1?.CustomItems != null)
+                    hud1.CustomItems.Clear();
+
+                tabPage1_Resize(tabGauges, EventArgs.Empty);
+            };
+
+            _gaugesContextMenu.Items.Add(addItem);
+            _gaugesContextMenu.Items.Add(new ToolStripSeparator());
+            _gaugesContextMenu.Items.Add(clearItem);
+
+            tabGauges.MouseUp += (s, e) =>
+            {
+                if (e.Button == MouseButtons.Right)
+                    _gaugesContextMenu.Show(tabGauges, e.Location);
+            };
+        }
+
+        private AGauge CreateCustomGauge(
+            string caption,
+            string bindingProperty,
+            float minValue,
+            float maxValue)
+        {
+            var g = new AGauge();
+
+            g.BackColor = Color.Transparent;
+            g.Size = new Size(150, 150);
+            g.MinimumSize = new Size(150, 150);
+
+            // ОСНОВНА ДУГА 
+            g.BaseArcColor = Color.Transparent;
+            g.BaseArcRadius = 70;
+            g.BaseArcStart = 135;
+            g.BaseArcSweep = 270;
+            g.BaseArcWidth = 2;
+            g.Center = new Point(75, 75);
+
+            // ===== ПІДПИС =====
+            g.Cap_Idx = 0;
+            g.CapColor = Color.White;
+            g.CapText = caption;
+            g.CapsText = new string[] { caption, "", "", "", "" };
+            g.CapColors = new Color[] { Color.White, Color.White, Color.Black, Color.Black, Color.Black };
+
+            int textWidth = (int)g.CreateGraphics().MeasureString(caption, g.Font).Width;
+
+            int capX = g.Center.X - textWidth / 2;
+            int capY = g.Center.Y + 8;
+
+            g.CapPosition = new Point(capX, capY);
+            g.CapsPosition = new Point[]
+            {
+                new Point(capX, capY),
+                new Point(capX, capY + 16),
+                Point.Empty,
+                Point.Empty,
+                Point.Empty
+            };
+
+            // ===== СТРІЛКИ =====
+            g.Need_Idx = 3;
+            g.NeedleColor1 = AGauge.NeedleColorEnum.Gray;
+            g.NeedleColor2 = Color.Brown;
+            g.NeedleEnabled = false;
+            g.NeedleRadius = 70;
+
+            g.NeedlesColor1 = new AGauge.NeedleColorEnum[]
+            {
+                AGauge.NeedleColorEnum.Gray,
+                AGauge.NeedleColorEnum.Red,
+                AGauge.NeedleColorEnum.Blue,
+                AGauge.NeedleColorEnum.Gray
+            };
+
+            g.NeedlesColor2 = new Color[]
+            {
+                Color.White,
+                Color.White,
+                Color.White,
+                Color.Brown
+            };
+
+            g.NeedlesEnabled = new bool[] { true, true, false, false };
+            g.NeedlesRadius  = new int[]  { 50, 50, 70, 70 };
+            g.NeedlesType    = new int[]  { 0, 0, 0, 0 };
+            g.NeedlesWidth   = new int[]  { 2, 1, 2, 2 };
+
+            g.NeedleType = 0;
+            g.NeedleWidth = 2;
+
+            // ===== ШКАЛА =====
+            g.ScaleLinesInterColor = Color.White;
+            g.ScaleLinesInterInnerRadius = 52;
+            g.ScaleLinesInterOuterRadius = 60;
+            g.ScaleLinesInterWidth = 1;
+
+            g.ScaleLinesMajorColor = Color.White;
+            g.ScaleLinesMajorInnerRadius = 50;
+            g.ScaleLinesMajorOuterRadius = 60;
+            g.ScaleLinesMajorStepValue = 10F;
+            g.ScaleLinesMajorWidth = 2;
+
+            g.ScaleLinesMinorColor = Color.White;
+            g.ScaleLinesMinorInnerRadius = 55;
+            g.ScaleLinesMinorOuterRadius = 60;
+            g.ScaleLinesMinorNumOf = 9;
+            g.ScaleLinesMinorWidth = 1;
+
+            g.ScaleNumbersColor = Color.White;
+            g.ScaleNumbersRadius = 42;
+
+            g.RangeEnabled = false;
+
+            g.RangesEnabled = new bool[]
+            {
+                false, false, false, false, false
+            };
+
+            g.RangesColor = new Color[]
+            {
+                Color.Transparent,
+                Color.Transparent,
+                Color.Transparent,
+                Color.Transparent,
+                Color.Transparent
+            };
+
+            // ===== МІН / МАКС =====
+            g.MinValue = minValue;
+            g.MaxValue = maxValue;
+
+            try
+            {
+                g.DataBindings.Add(
+                    new Binding("Value0", bindingSourceGaugesTab, bindingProperty, true)
+                );
+            }
+            catch
+            {
+                return null;
+            }
+
+            g.Value0 = 0f;
+
+            // ===== КОНТЕКСТНЕ МЕНЮ =====
+            var cm = new ContextMenuStrip();
+            cm.Items.Add("Delete gauge", null, (s, e) =>
+            {
+                _customGauges.Remove(g);
+
+                if (CurrentState.custom_field_names.ContainsKey(bindingProperty))
+                    CurrentState.custom_field_names.Remove(bindingProperty);
+
+                g.Parent?.Controls.Remove(g);
+                g.Dispose();
+
+                tabPage1_Resize(tabGauges, EventArgs.Empty);
+            });
+
+
+            g.ContextMenuStrip = cm;
+
+            g.Name = "gauge_" + bindingProperty;
+            _customGauges.Add(g);
+
+            return g;
+        }
+
+        void AddCustomGaugeItem(string fieldName, string caption)
+        {
+            if (CurrentState.custom_field_names == null)
+                CurrentState.custom_field_names = new Dictionary<string, string>();
+
+            if (!CurrentState.custom_field_names.ContainsKey(fieldName))
+                CurrentState.custom_field_names[fieldName] = caption;
+
+            RebuildCustomGaugesFromSelection();
+        }
+
+        void chk_box_customGauge_CheckedChanged(object sender, EventArgs e)
+        {
+            CheckBox checkbox = (CheckBox)sender;
+
+            if (checkbox.Checked)
+            {
+                checkbox.BackColor = Color.Green;
+
+                string caption = checkbox.Text;
+
+                if (DialogResult.Cancel == InputBox.Show(
+                    "Gauge caption",
+                    "Please enter your gauge caption",
+                    ref caption))
+                {
+                    checkbox.Checked = false;
+                    return;
+                }
+
+                AddCustomGaugeItem(checkbox.Name, caption);
+            }
+            else
+            {
+                checkbox.BackColor = Color.Transparent;
+
+                if (CurrentState.custom_field_names.ContainsKey(checkbox.Name))
+                    CurrentState.custom_field_names.Remove(checkbox.Name);
+
+                RebuildCustomGaugesFromSelection();
+            }
+        }
+
+       private void ShowGaugeParamSelectForm()
+        {
+            if (MainV2.comPort?.MAV?.cs == null)
+                return;
+
+            Form selectform = new Form
+            {
+                Name = "selectGaugeParams",
+                Width = 50,
+                Height = 50,
+                Text = "Display This gauges",
+                AutoSize = true,
+                StartPosition = FormStartPosition.CenterParent,
+                MaximizeBox = false,
+                MinimizeBox = false,
+                AutoScroll = true
+            };
+
+            ThemeManager.ApplyThemeTo(selectform);
+
+            object thisBoxed = MainV2.comPort.MAV.cs;
+            Type test = thisBoxed.GetType();
+
+            if (CurrentState.custom_field_names == null)
+                CurrentState.custom_field_names = new Dictionary<string, string>();
+
+            int max_length = 0;
+            var fields = new List<(string name, string desc)>();
+
+            foreach (var field in test.GetProperties())
+            {
+                object fieldValue = field.GetValue(thisBoxed, null);
+                if (fieldValue == null || !fieldValue.IsNumber())
+                    continue;
+
+                string displayName = CurrentState.custom_field_names.ContainsKey(field.Name)
+                    ? CurrentState.custom_field_names[field.Name]
+                    : field.Name;
+
+                max_length = Math.Max(
+                    max_length,
+                    TextRenderer.MeasureText(displayName, selectform.Font).Width);
+
+                fields.Add((field.Name, displayName));
+            }
+
+            max_length += 15;
+            fields.Sort((a, b) => CurrentState.StringCompareTo(a.desc, b.desc));
+
+            int col_count = (int)(Screen.FromControl(this).Bounds.Width * 0.8f) / max_length;
+            if (col_count < 1) col_count = 1;
+
+            int row_count = fields.Count / col_count + ((fields.Count % col_count == 0) ? 0 : 1);
+            int row_height = 22;
+
+            var checkboxes = new List<CheckBox>();
+
+            selectform.SuspendLayout();
+
+            for (int i = 0; i < fields.Count; i++)
+            {
+                var chk = new CheckBox
+                {
+                    Text = fields[i].desc,
+                    Name = fields[i].name,
+                    Tag = "gauge",
+                    Location = new Point(
+                        5 + (i / row_count) * (max_length + 15),
+                        2 + (i % row_count) * row_height),
+                    AutoSize = true,
+
+                    Checked = CurrentState.custom_field_names.ContainsKey(fields[i].name)
+                };
+
+                chk.CheckedChanged += chk_box_customGauge_CheckedChanged;
+
+                selectform.Controls.Add(chk);
+                checkboxes.Add(chk);
+            }
+
+            selectform.ResumeLayout();
+            selectform.ShowDialog(this);
+        }
+
+        private void RebuildCustomGaugesFromSelection()
+        {
+            foreach (var g in _customGauges.ToList())
+            {
+                g?.Parent?.Controls.Remove(g);
+                g?.Dispose();
+            }
+
+            _customGauges.Clear();
+
+            if (CurrentState.custom_field_names == null)
+                return;
+
+            foreach (string fieldName in CurrentState.custom_field_names.Keys)
+            {
+                string caption = CurrentState.custom_field_names[fieldName];
+
+                var g = CreateCustomGauge(caption, fieldName, 0, 100);
+                if (g == null)
+                    continue;
+            }
+
+            tabPage1_Resize(tabGauges, EventArgs.Empty);
+        }
+
+        private void tabPage1_Resize(object sender, EventArgs e)
+        {
+            int mysize;
+
+            Control tabGauges = sender as Control;
+            if (tabGauges == null) return;
+
+            float scale = tabGauges.Width / (float)tabGauges.Height;
+
+            var allGauges = new List<Control>();
+
+            if (Gvspeed != null)   allGauges.Add(Gvspeed);
+            if (Gspeed != null)   allGauges.Add(Gspeed);
+            if (Galt != null)     allGauges.Add(Galt);
+            if (Gheading != null) allGauges.Add(Gheading);
+
+            allGauges.AddRange(
+                _customGauges
+                    .Where(g => g != null)
+                    .Cast<Control>()
+            );
+
+            if (allGauges.Count == 0)
+                return;
+
+            if (scale > 0.5 && scale < 1.9)
+            {
+                if (tabGauges.Height < tabGauges.Width)
+                    mysize = tabGauges.Height / 2;
+                else
+                    mysize = tabGauges.Width / 2;
+            }
+            else
+            {
+                if (tabGauges.Width < 500)
+                    mysize = tabGauges.Width / 3;
+                else
+                    mysize = tabGauges.Width / 4;
+            }
+
+            foreach (var g in _customGauges)
+            {
+                if (g.Parent == null)
+                    tabGauges.Controls.Add(g);   
+            }
+
+            int x = 0;
+            int y = 0;
+
+            foreach (var g in allGauges)
+            {
+                if (x + mysize > tabGauges.Width)
+                {
+                    x = 0;
+                    y += mysize;
+                }
+
+                g.Width  = mysize;
+                g.Height = mysize;
+                g.Location = new Point(x, y);
+                g.Visible = true;
+
+                x += mysize;
+            }
         }
 
         private void loadTabControlActions()
@@ -5177,69 +5590,6 @@ namespace MissionPlanner.GCSViews
                 {
                 }
             }
-        }
-
-        private void tabPage1_Resize(object sender, EventArgs e)
-        {
-            int mywidth, myheight;
-
-            // localize it
-            Control tabGauges = sender as Control;
-
-            float scale = tabGauges.Width / (float) tabGauges.Height;
-
-            if (scale > 0.5 && scale < 1.9)
-            {
-                // square
-                Gvspeed.Visible = true;
-
-                if (tabGauges.Height < tabGauges.Width)
-                    myheight = tabGauges.Height / 2;
-                else
-                    myheight = tabGauges.Width / 2;
-
-                Gvspeed.Height = myheight;
-                Gspeed.Height = myheight;
-                Galt.Height = myheight;
-                Gheading.Height = myheight;
-
-                Gvspeed.Location = new Point(0, 0);
-                Gspeed.Location = new Point(Gvspeed.Right, 0);
-
-
-                Galt.Location = new Point(0, Gspeed.Bottom);
-                Gheading.Location = new Point(Galt.Right, Gspeed.Bottom);
-
-                return;
-            }
-
-            if (tabGauges.Width < 500)
-            {
-                Gvspeed.Visible = false;
-                mywidth = tabGauges.Width / 3;
-
-                Gspeed.Height = mywidth;
-                Galt.Height = mywidth;
-                Gheading.Height = mywidth;
-
-                Gspeed.Location = new Point(0, 0);
-            }
-            else
-            {
-                Gvspeed.Visible = true;
-                mywidth = tabGauges.Width / 4;
-
-                Gvspeed.Height = mywidth;
-                Gspeed.Height = mywidth;
-                Galt.Height = mywidth;
-                Gheading.Height = mywidth;
-
-                Gvspeed.Location = new Point(0, 0);
-                Gspeed.Location = new Point(Gvspeed.Right, 0);
-            }
-
-            Galt.Location = new Point(Gspeed.Right, 0);
-            Gheading.Location = new Point(Galt.Right, 0);
         }
 
         private void tabQuick_Resize(object sender, EventArgs e)
