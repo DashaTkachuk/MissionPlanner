@@ -727,6 +727,12 @@ namespace MissionPlanner.GCSViews
             TabListDisplay.Add(tabPayload.Name, MainV2.DisplayConfiguration.displayPayloadTab);
         }
 
+        public enum GaugeKind
+        {
+            Scale   //  шкальний 
+        }
+
+        private GaugeKind _pendingGaugeKind = GaugeKind.Scale;
         private ContextMenuStrip _gaugesContextMenu;
         private readonly List<AGauge> _customGauges = new List<AGauge>();
 
@@ -737,7 +743,7 @@ namespace MissionPlanner.GCSViews
             var addItem = new ToolStripMenuItem("Add gauge");
             addItem.Click += (s, e) =>
             {
-                ShowGaugeParamSelectForm();
+                ShowGaugeTypeSelectForm();   
             };
 
             var clearItem = new ToolStripMenuItem("Remove all custom gauges");
@@ -801,7 +807,8 @@ namespace MissionPlanner.GCSViews
             var g = CreateCustomGauge(caption, binding, 0, newMax);
 
             float step;
-            if (newMax <= 200) step = 20;
+            if (newMax <= 100) step = 10;
+            else if (newMax <= 200) step = 20;
             else if (newMax <= 500) step = 50;
             else if (newMax <= 1000) step = 100;
             else if (newMax <= 2000) step = 200;
@@ -968,15 +975,20 @@ namespace MissionPlanner.GCSViews
                 g.ScaleLinesMinorNumOf = 10;
             }
 
-            try
+            bool isPreview = bindingProperty == "preview_value";
+
+            if (!isPreview)
             {
-                g.DataBindings.Add(
-                    new Binding("Value0", bindingSourceGaugesTab, bindingProperty, true)
-                );
-            }
-            catch
-            {
-                return null;
+                try
+                {
+                    g.DataBindings.Add(
+                        new Binding("Value0", bindingSourceGaugesTab, bindingProperty, true)
+                    );
+                }
+                catch
+                {
+                    // якщо binding не вдався — просто ігноруємо
+                }
             }
 
             g.Value0 = 0f;
@@ -995,7 +1007,6 @@ namespace MissionPlanner.GCSViews
 
                 tabPage1_Resize(tabGauges, EventArgs.Empty);
             });
-
 
             g.ContextMenuStrip = cm;
 
@@ -1048,6 +1059,72 @@ namespace MissionPlanner.GCSViews
 
                 RebuildCustomGaugesFromSelection();
             }
+        }
+
+       private void ShowGaugeTypeSelectForm()
+        {
+            Form form = new Form
+            {
+                Text = "Select gauge type",
+                Width = 360,
+                Height = 330,  
+                StartPosition = FormStartPosition.CenterParent,
+                MaximizeBox = false,
+                MinimizeBox = false,
+                FormBorderStyle = FormBorderStyle.FixedDialog,
+                BackColor = Color.FromArgb(40, 40, 40)
+            };
+
+            try
+            {
+                ThemeManager.ApplyThemeTo(form);
+            }
+            catch { }
+
+            var preview = CreateCustomGauge("Preview", "preview_value", 0, 100);
+
+            if (preview != null)
+            {
+                preview.Width = 180;
+                preview.Height = 180;
+
+                preview.Location = new Point(
+                    (form.ClientSize.Width - preview.Width) / 2,
+                    15
+                );
+
+                preview.Enabled = false;   
+                preview.Value0 = 55;       
+
+                form.Controls.Add(preview);
+            }
+
+            var btnScale = new System.Windows.Forms.Button
+            {
+                Text = "Scale gauge",
+                Width = 220,
+                Height = 40,
+                BackColor = Color.FromArgb(150, 200, 40),
+                ForeColor = Color.Black,
+                FlatStyle = FlatStyle.Flat,
+                Location = new Point(
+                    (form.ClientSize.Width - 220) / 2,
+                    form.ClientSize.Height - 55   
+                )
+            };
+
+            btnScale.FlatAppearance.BorderSize = 0;
+
+            btnScale.Click += (s, e) =>
+            {
+                _pendingGaugeKind = GaugeKind.Scale;
+                form.Close();
+                ShowGaugeParamSelectForm();
+            };
+
+            form.Controls.Add(btnScale);
+
+            form.ShowDialog(this);
         }
 
        private void ShowGaugeParamSelectForm()
