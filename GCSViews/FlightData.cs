@@ -1442,7 +1442,6 @@ namespace MissionPlanner.GCSViews
             g.BackColor = Color.Black;
             g.Size = new Size(150, 150);
             g.MinimumSize = new Size(150, 150);
-            g.Center = new Point(75, 75);
 
             g.NeedlesEnabled = new bool[] { false, false, false, false };
             g.NeedleEnabled = false;
@@ -1459,6 +1458,11 @@ namespace MissionPlanner.GCSViews
             g.BaseArcRadius = 60;
             g.BaseArcStart = 270;
             g.BaseArcSweep = 360;
+            g.BaseArcRadius = 60;
+            g.BaseArcWidth = 2;
+
+            g.Center = new Point(75, 75);
+
 
             g.ScaleLinesInterColor = Color.White;
             g.ScaleLinesInterInnerRadius = g.BaseArcRadius;
@@ -1467,72 +1471,68 @@ namespace MissionPlanner.GCSViews
 
             g.ScaleLinesMajorWidth = 0;
             g.ScaleLinesMinorWidth = 0;
-
             g.ScaleLinesMajorColor = Color.Transparent;
             g.ScaleLinesMinorColor = Color.Transparent;
 
             // =========================================================
-            // CAPTION
+            // DIGITAL VALUE 
             // =========================================================
-            g.Cap_Idx = 0;
-            g.CapColor = Color.White;
-            g.CapText = caption;
-
-            // =========================================================
-            // DIGITAL VALUE
-            // =========================================================
-           var label = new Label
+            var label = new Label
             {
                 AutoSize = false,
                 ForeColor = Color.White,
                 BackColor = Color.Transparent,
-                TextAlign = ContentAlignment.MiddleCenter,
                 Font = new Font("Consolas", 20, FontStyle.Regular),
-                Text = "00.00"
+                Text = "00.00",
+                TextAlign = ContentAlignment.MiddleCenter
             };
 
-            Action updateLayout = () =>
-            {
-                int size = Math.Min(g.Width, g.Height);
+            Size labelSize = TextRenderer.MeasureText(
+                label.Text,
+                label.Font,
+                Size.Empty,
+                TextFormatFlags.NoPadding | TextFormatFlags.SingleLine
+            );
 
-                float fontSize = size * 0.18f;
-                if (fontSize < 10) fontSize = 10;
+            label.Size = labelSize;
 
-                label.Font?.Dispose();
-                label.Font = new Font("Consolas", fontSize, FontStyle.Regular);
+            int centerX = (g.Width - label.Width) / 2;
+            int centerY = (g.Height - label.Height) / 2 - 10; 
 
-                Size textSize = TextRenderer.MeasureText(
-                    label.Text,
-                    label.Font,
-                    Size.Empty,
-                    TextFormatFlags.NoPadding | TextFormatFlags.SingleLine
-                );
+            label.Location = new Point(centerX, centerY);
 
-                int visualCenterY = g.Center.Y - (int)(g.Height * 0.12f);
-
-                label.Size = textSize;
-                label.Location = new Point(
-                    g.Center.X - textSize.Width / 2,
-                    visualCenterY - textSize.Height / 2
-                );
-
-                int capTextWidth = TextRenderer.MeasureText(
-                    caption,
-                    g.Font,
-                    Size.Empty,
-                    TextFormatFlags.NoPadding | TextFormatFlags.SingleLine
-                ).Width;
-
-                g.CapPosition = new Point(
-                    g.Center.X - capTextWidth / 2,
-                    g.Center.Y + (int)(g.Height * 0.18f)
-                );
-            };
+            g.Tag = -10;
 
             g.Controls.Add(label);
-            label.TextChanged += (s, e) => updateLayout();
-            g.Resize += (s, e) => updateLayout();
-            updateLayout();
+
+            // =========================================================
+            // CAPTION 
+            // =========================================================
+            g.CapsText = new string[] { caption, "", "", "", "" };
+            g.CapColors = new Color[]
+            {
+                Color.White, Color.Black, Color.Black, Color.Black, Color.Black
+            };
+
+            Size capSize = TextRenderer.MeasureText(
+                caption,
+                g.Font,
+                Size.Empty,
+                TextFormatFlags.NoPadding | TextFormatFlags.SingleLine
+            );
+
+            int capX = (g.Width - capSize.Width) / 2;
+            int capY = g.Height / 2 + 18;
+
+            g.CapPosition = new Point(capX, capY);
+            g.CapsPosition = new Point[]
+            {
+                new Point(capX, capY),
+                Point.Empty,
+                Point.Empty,
+                Point.Empty,
+                Point.Empty
+            };
 
             bool isPreview = bindingProperty == "preview_value";
 
@@ -2032,6 +2032,20 @@ namespace MissionPlanner.GCSViews
                 g.Height = mysize;
                 g.Location = new Point(x, y);
                 g.Visible = true;
+
+                if (g is AGauge gauge && gauge.Tag is int vOffset)
+                {
+                    foreach (Control c in gauge.Controls)
+                    {
+                        if (c is Label lbl)
+                        {
+                            lbl.Location = new Point(
+                                (gauge.Width  - lbl.Width)  / 2,
+                                (gauge.Height - lbl.Height) / 2 + vOffset
+                            );
+                        }
+                    }
+                }
 
                 x += mysize;
             }
