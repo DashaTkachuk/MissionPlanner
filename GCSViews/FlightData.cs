@@ -733,7 +733,8 @@ namespace MissionPlanner.GCSViews
             Scale,    // шкальний
             Bipolar,  // біполярний
             Circular, // круговий 
-            Digital   //цифровий
+            Digital,  //цифровий
+            Ranges    //зонний
         }
 
         private readonly Dictionary<string, GaugeKind> _customGaugeKinds =
@@ -1458,7 +1459,6 @@ namespace MissionPlanner.GCSViews
             g.BaseArcRadius = 60;
             g.BaseArcStart = 270;
             g.BaseArcSweep = 360;
-            g.BaseArcRadius = 60;
             g.BaseArcWidth = 2;
 
             g.Center = new Point(75, 75);
@@ -1605,6 +1605,226 @@ namespace MissionPlanner.GCSViews
             return g;
         }
 
+        private AGauge CreateRangesGauge(
+            string caption,
+            string bindingProperty,
+            float minValue,
+            float maxValue)
+        {
+            var g = new AGauge();
+
+            g.BackColor = Color.Transparent;
+            g.Size = new Size(150, 150);
+            g.MinimumSize = new Size(150, 150);
+
+            // =========================
+            // ОСНОВНА ДУГА
+            // =========================
+            g.BaseArcColor = Color.Transparent;
+            g.BaseArcRadius = 70;
+            g.BaseArcStart = 135;
+            g.BaseArcSweep = 270;
+            g.BaseArcWidth = 2;
+            g.Center = new Point(75, 75);
+
+            // =========================
+            // ПІДПИС
+            // =========================
+            g.Cap_Idx = 0;
+            g.CapColor = Color.White;
+            g.CapText = caption;
+            g.CapsText = new string[] { caption, "", "", "", "" };
+            g.CapColors = new Color[]
+            {
+                Color.White, Color.White,
+                Color.Black, Color.Black, Color.Black
+            };
+
+            int textWidth = (int)g.CreateGraphics()
+                .MeasureString(caption, g.Font).Width;
+
+            int capX = g.Center.X - textWidth / 2;
+            int capY = g.Center.Y + 8;
+
+            g.CapPosition = new Point(capX, capY);
+            g.CapsPosition = new Point[]
+            {
+                new Point(capX, capY),
+                new Point(capX, capY + 16),
+                Point.Empty,
+                Point.Empty,
+                Point.Empty
+            };
+
+            // =========================
+            // СТРІЛКИ
+            // =========================
+            g.Need_Idx = 3;
+            g.NeedleEnabled = false;
+            g.NeedleRadius = 70;
+
+            g.NeedlesEnabled = new bool[] { true, true, false, false };
+            g.NeedlesColor1 = new AGauge.NeedleColorEnum[]
+            {
+                AGauge.NeedleColorEnum.Gray,
+                AGauge.NeedleColorEnum.Red,
+                AGauge.NeedleColorEnum.Blue,
+                AGauge.NeedleColorEnum.Gray
+            };
+
+            g.NeedlesColor2 = new Color[]
+            {
+                Color.White,
+                Color.White,
+                Color.White,
+                Color.Brown
+            };
+
+            g.NeedlesRadius = new int[] { 50, 50, 70, 70 };
+            g.NeedlesType   = new int[] { 0, 0, 0, 0 };
+            g.NeedlesWidth  = new int[] { 2, 1, 2, 2 };
+
+            g.NeedleType = 0;
+            g.NeedleWidth = 2;
+
+            // =========================
+            // ШКАЛА
+            // =========================
+            g.ScaleLinesInterColor = Color.White;
+            g.ScaleLinesInterInnerRadius = 52;
+            g.ScaleLinesInterOuterRadius = 60;
+            g.ScaleLinesInterWidth = 1;
+
+            g.ScaleLinesMajorColor = Color.White;
+            g.ScaleLinesMajorInnerRadius = 50;
+            g.ScaleLinesMajorOuterRadius = 60;
+            g.ScaleLinesMajorWidth = 2;
+
+            g.ScaleLinesMinorColor = Color.White;
+            g.ScaleLinesMinorInnerRadius = 55;
+            g.ScaleLinesMinorOuterRadius = 60;
+            g.ScaleLinesMinorWidth = 1;
+
+            g.ScaleNumbersColor = Color.White;
+            g.ScaleNumbersRadius = 42;
+
+            // =========================
+            // МІН / МАКС
+            // =========================
+            g.MinValue = minValue;
+
+            string keyMax = "gauge_" + bindingProperty + "_MAX";
+
+            if (Settings.Instance[keyMax] != null &&
+                float.TryParse(Settings.Instance[keyMax], out float savedMax))
+            {
+                g.MaxValue = savedMax;
+            }
+            else
+            {
+                g.MaxValue = maxValue;
+            }
+
+            g.ScaleLinesMajorStepValue = (g.MaxValue - g.MinValue) / 10f;
+            g.ScaleLinesMinorNumOf = 10;
+
+            // =========================
+            // КОЛЬОРОВІ RANGES (3 ЗОНИ)
+            // =========================
+            g.RangeEnabled = true;
+
+            g.RangesEnabled = new bool[]
+            {
+                true,   // GREEN
+                true,   // YELLOW
+                true,   // RED
+                false,
+                false
+            };
+
+            g.RangesColor = new Color[]
+            {
+                Color.LimeGreen,
+                Color.Gold,
+                Color.Red,
+                Color.Transparent,
+                Color.Transparent
+            };
+
+            float span = g.MaxValue - g.MinValue;
+
+            g.RangesStartValue = new float[]
+            {
+                g.MinValue,
+                g.MinValue + span * 0.60f,
+                g.MinValue + span * 0.85f,
+                0, 0
+            };
+
+            g.RangesEndValue = new float[]
+            {
+                g.MinValue + span * 0.60f,
+                g.MinValue + span * 0.85f,
+                g.MaxValue,
+                0, 0
+            };
+
+            g.RangesInnerRadius = new int[] { 62, 62, 62, 0, 0 };
+            g.RangesOuterRadius = new int[] { 68, 68, 68, 0, 0 };
+
+            // =========================
+            // DATA BINDING
+            // =========================
+            bool isPreview = bindingProperty == "preview_value";
+
+            if (!isPreview)
+            {
+                try
+                {
+                    g.DataBindings.Add(
+                        new Binding("Value0", bindingSourceGaugesTab, bindingProperty, true)
+                    );
+                }
+                catch
+                {
+                    // ignore
+                }
+            }
+
+            g.Value0 = 0f;
+
+            // =========================
+            // КОНТЕКСТНЕ МЕНЮ
+            // =========================
+            var cm = new ContextMenuStrip();
+            cm.Items.Add("Delete gauge", null, (s, e) =>
+            {
+                _customGauges.Remove(g);
+                _customGaugeKinds.Remove(bindingProperty);
+
+                if (CurrentState.custom_field_names.ContainsKey(bindingProperty))
+                    CurrentState.custom_field_names.Remove(bindingProperty);
+
+                g.Parent?.Controls.Remove(g);
+                g.Dispose();
+
+                tabPage1_Resize(tabGauges, EventArgs.Empty);
+            });
+
+            g.ContextMenuStrip = cm;
+            g.Name = "gauge_" + bindingProperty;
+
+            if (bindingProperty != "preview_value")
+            {
+                _customGaugeKinds[bindingProperty] = GaugeKind.Scale;
+                _customGauges.Add(g);
+            }
+
+            g.DoubleClick += ScaleGauge_DoubleClick;
+
+            return g;
+        }
+
        void AddCustomGaugeItem(string fieldName, string caption)
         {
             if (CurrentState.custom_field_names == null)
@@ -1630,6 +1850,10 @@ namespace MissionPlanner.GCSViews
             else if (_pendingGaugeKind == GaugeKind.Digital)
             {
                 g = CreateDigitalGauge(caption, fieldName, "00.00");
+            }
+             else if (_pendingGaugeKind == GaugeKind.Ranges)
+            {
+                g = CreateRangesGauge(caption, fieldName, 0, 100);
             }
 
             if (g != null)
@@ -1676,7 +1900,7 @@ namespace MissionPlanner.GCSViews
             Form form = new Form
             {
                 Text = "Select gauge type",
-                Width = 720,
+                Width = 900,
                 Height = 420,
                 StartPosition = FormStartPosition.CenterParent,
                 MaximizeBox = false,
@@ -1691,11 +1915,11 @@ namespace MissionPlanner.GCSViews
             int marginTop = 20;
             int spacing = 20;
 
-            // X координати для 4 датчиків
             int col1 = 20;
             int col2 = col1 + previewSize + spacing;
             int col3 = col2 + previewSize + spacing;
             int col4 = col3 + previewSize + spacing;
+            int col5 = col4 + previewSize + spacing;
 
             // ============================================================
             // PREVIEW — SCALE
@@ -1739,6 +1963,18 @@ namespace MissionPlanner.GCSViews
             previewDigital.Height = previewSize;
             previewDigital.Location = new Point(col4, marginTop);
             form.Controls.Add(previewDigital);
+
+            // ============================================================
+            // PREVIEW — RANGES
+            // ============================================================
+            var previewRanges = CreateRangesGauge("Preview", "preview_value", 0, 100);
+            previewRanges.Enabled = false;
+            previewRanges.Width = previewSize;
+            previewRanges.Height = previewSize;
+            previewRanges.Value0 = 75;
+            previewRanges.Location = new Point(col5, marginTop);
+            form.Controls.Add(previewRanges);
+
 
             // ============================ BUTTONS ============================
 
@@ -1823,6 +2059,26 @@ namespace MissionPlanner.GCSViews
                 ShowGaugeParamSelectForm();
             };
             form.Controls.Add(btnDigital);
+
+            // RANGES BUTTON
+            var btnRanges = new Button
+            {
+                Text = "Ranges gauge",
+                Width = previewSize,
+                Height = 36,
+                BackColor = Color.FromArgb(150, 200, 40),
+                ForeColor = Color.Black,
+                FlatStyle = FlatStyle.Flat
+            };
+            btnRanges.FlatAppearance.BorderSize = 0;
+            btnRanges.Location = new Point(col5, btnY);
+            btnRanges.Click += (s, e) =>
+            {
+                _pendingGaugeKind = GaugeKind.Ranges;
+                form.Close();
+                ShowGaugeParamSelectForm();
+            };
+            form.Controls.Add(btnRanges);
 
             // ============================================================
             // SHOW DIALOG
@@ -1958,7 +2214,12 @@ namespace MissionPlanner.GCSViews
                     case GaugeKind.Digital:
                         g = CreateDigitalGauge(caption, fieldName, "00.00");
                         break;
+
+                    case GaugeKind.Ranges:
+                    g = CreateRangesGauge(caption, fieldName, 0, 100);
+                    break;
                 }
+                
 
                 if (g != null)
                 {
