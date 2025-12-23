@@ -733,8 +733,9 @@ namespace MissionPlanner.GCSViews
             Scale,    // шкальний
             Bipolar,  // біполярний
             Circular, // круговий 
-            Digital,  //цифровий
-            Ranges    //зонний
+            Digital,  // цифровий
+            Ranges,   // зонний
+            Compass   // компас 
         }
 
         private readonly Dictionary<string, GaugeKind> _customGaugeKinds =
@@ -1825,6 +1826,84 @@ namespace MissionPlanner.GCSViews
             return g;
         }
 
+        private AGauge CreateCompassGauge(string caption, string bindingProperty)
+        {
+            var g = new AGauge();
+
+            g.BackColor = Color.Transparent;
+            g.Size = new Size(150, 150);
+            g.MinimumSize = new Size(150, 150);
+            g.Center = new Point(75, 75);
+
+            g.BaseArcColor = Color.Transparent;
+            g.BaseArcRadius = 60;
+            g.BaseArcStart = 270;
+            g.BaseArcSweep = 360;
+            g.BaseArcWidth = 2;
+
+            // ===== SCALE =====
+            g.MinValue = 0;
+            g.MaxValue = 360;
+
+            g.ScaleLinesMajorColor = Color.White;
+            g.ScaleLinesMajorInnerRadius = 50;
+            g.ScaleLinesMajorOuterRadius = 60;
+            g.ScaleLinesMajorStepValue = 30f;
+            g.ScaleLinesMajorWidth = 2;
+
+            g.ScaleLinesMinorColor = Color.White;
+            g.ScaleLinesMinorInnerRadius = 55;
+            g.ScaleLinesMinorOuterRadius = 60;
+            g.ScaleLinesMinorNumOf = 5;
+            g.ScaleLinesMinorWidth = 1;
+
+            g.ScaleNumbersColor = Color.White;
+            g.ScaleNumbersRadius = 42;
+            g.ScaleNumbersRotation = 0;
+            g.ScaleNumbersStartScaleLine = 0;
+            g.ScaleNumbersStepScaleLines = 1;
+
+            // ===== NEEDLES =====
+            g.NeedleEnabled = false;
+            g.Need_Idx = 3;
+
+            g.NeedlesEnabled = new[] { true, true, true, true };
+            g.NeedlesRadius  = new[] { 0, 58, 14, 14 };
+            g.NeedlesWidth   = new[] { 0, 3, 3, 3 };
+            g.NeedlesType    = new[] { 0, 0, 0, 0 };
+
+            g.NeedlesColor1 = new[]
+            {
+                AGauge.NeedleColorEnum.Gray,
+                AGauge.NeedleColorEnum.Red,
+                AGauge.NeedleColorEnum.Red,
+                AGauge.NeedleColorEnum.Red
+            };
+
+            g.RangeEnabled = false;
+            g.RangesEnabled = new bool[] { false, false, false, false, false };
+
+            bool isPreview = bindingProperty == "preview_value";
+            if (!isPreview)
+            {
+                g.DataBindings.Add(new Binding("Value0", bindingSourceGaugesTab, "yaw", true));
+                g.DataBindings.Add(new Binding("Value1", bindingSourceGaugesTab, "nav_bearing", true));
+            }
+
+            g.Value2 = 90;
+            g.Value3 = 0;
+
+            g.Name = "compass_" + bindingProperty;
+
+            if (!isPreview)
+            {
+                _customGaugeKinds[bindingProperty] = GaugeKind.Compass;
+                _customGauges.Add(g);
+            }
+
+            return g;
+        }
+
        void AddCustomGaugeItem(string fieldName, string caption)
         {
             if (CurrentState.custom_field_names == null)
@@ -1854,6 +1933,10 @@ namespace MissionPlanner.GCSViews
              else if (_pendingGaugeKind == GaugeKind.Ranges)
             {
                 g = CreateRangesGauge(caption, fieldName, 0, 100);
+            }
+            else if (_pendingGaugeKind == GaugeKind.Compass)
+            {
+                g = CreateCompassGauge(caption, fieldName);
             }
 
             if (g != null)
@@ -1895,13 +1978,37 @@ namespace MissionPlanner.GCSViews
             }
         }
 
+        private Button CreateGaugeButton(
+            string text,
+            int x,
+            int y,
+            Action onClick,
+            Color? backColor = null)
+        {
+            var btn = new Button
+            {
+                Text = text,
+                Width = 150,
+                Height = 36,
+                BackColor = backColor ?? Color.FromArgb(150, 200, 40),
+                ForeColor = Color.Black,
+                FlatStyle = FlatStyle.Flat,
+                Location = new Point(x, y)
+            };
+
+            btn.FlatAppearance.BorderSize = 0;
+            btn.Click += (s, e) => onClick();
+
+            return btn;
+        }
+
        private void ShowGaugeTypeSelectForm()
         {
             Form form = new Form
             {
                 Text = "Select gauge type",
-                Width = 900,
-                Height = 420,
+                Width = 550,
+                Height = 500,
                 StartPosition = FormStartPosition.CenterParent,
                 MaximizeBox = false,
                 MinimizeBox = false,
@@ -1912,177 +2019,139 @@ namespace MissionPlanner.GCSViews
             try { ThemeManager.ApplyThemeTo(form); } catch { }
 
             int previewSize = 150;
-            int marginTop = 20;
-            int spacing = 20;
+            int spacingX = 20;
+            int spacingY = 20;
 
-            int col1 = 20;
-            int col2 = col1 + previewSize + spacing;
-            int col3 = col2 + previewSize + spacing;
-            int col4 = col3 + previewSize + spacing;
-            int col5 = col4 + previewSize + spacing;
+            int marginLeft = 20;
+            int marginTop = 20;
+
+            int btnHeight = 36;
+
+            // ===== X positions (3 columns) =====
+            int col1 = marginLeft;
+            int col2 = col1 + previewSize + spacingX;
+            int col3 = col2 + previewSize + spacingX;
+
+            // ===== Y positions (2 rows) =====
+            int row1PreviewY = marginTop;
+            int row1ButtonY  = row1PreviewY + previewSize + 8;
+
+            int row2PreviewY = row1ButtonY + btnHeight + spacingY;
+            int row2ButtonY  = row2PreviewY + previewSize + 8;
 
             // ============================================================
-            // PREVIEW — SCALE
+            // ROW 1 — SCALE
             // ============================================================
             var previewScale = CreateScaleGauge("Preview", "preview_value", 0, 100);
             previewScale.Enabled = false;
-            previewScale.Width = previewSize;
-            previewScale.Height = previewSize;
+            previewScale.Size = new Size(previewSize, previewSize);
             previewScale.Value0 = 65;
-            previewScale.Location = new Point(col1, marginTop);
+            previewScale.Location = new Point(col1, row1PreviewY);
             form.Controls.Add(previewScale);
 
-            // ============================================================
-            // PREVIEW — BIPOLAR
-            // ============================================================
-            var previewBipolar = CreateBipolarGauge("Preview", "preview_value", -10, 10);
-            previewBipolar.Enabled = false;
-            previewBipolar.Width = previewSize;
-            previewBipolar.Height = previewSize;
-            previewBipolar.Value0 = 2;
-            previewBipolar.Location = new Point(col2, marginTop);
-            form.Controls.Add(previewBipolar);
-
-            // ============================================================
-            // PREVIEW — CIRCULAR
-            // ============================================================
-            var previewCircular = CreateCircularGauge("Preview", "preview_value", 0, 10);
-            previewCircular.Enabled = false;
-            previewCircular.Width = previewSize;
-            previewCircular.Height = previewSize;
-            previewCircular.Value0 = 4;
-            previewCircular.Location = new Point(col3, marginTop);
-            form.Controls.Add(previewCircular);
-
-            // ============================================================
-            // PREVIEW — DIGITAL
-            // ============================================================
-            var previewDigital = CreateDigitalGauge("Preview", "preview_value", "00.00");
-            previewDigital.Enabled = true;
-            previewDigital.Width = previewSize;
-            previewDigital.Height = previewSize;
-            previewDigital.Location = new Point(col4, marginTop);
-            form.Controls.Add(previewDigital);
-
-            // ============================================================
-            // PREVIEW — RANGES
-            // ============================================================
-            var previewRanges = CreateRangesGauge("Preview", "preview_value", 0, 100);
-            previewRanges.Enabled = false;
-            previewRanges.Width = previewSize;
-            previewRanges.Height = previewSize;
-            previewRanges.Value0 = 75;
-            previewRanges.Location = new Point(col5, marginTop);
-            form.Controls.Add(previewRanges);
-
-
-            // ============================ BUTTONS ============================
-
-            int btnY = marginTop + previewSize + 10;
-
-            // SCALE BUTTON
-            var btnScale = new Button
-            {
-                Text = "Scale gauge",
-                Width = previewSize,
-                Height = 36,
-                BackColor = Color.FromArgb(150, 200, 40),
-                ForeColor = Color.Black,
-                FlatStyle = FlatStyle.Flat
-            };
-            btnScale.FlatAppearance.BorderSize = 0;
-            btnScale.Location = new Point(col1, btnY);
-            btnScale.Click += (s, e) =>
+            var btnScale = CreateGaugeButton("Scale gauge", col1, row1ButtonY, () =>
             {
                 _pendingGaugeKind = GaugeKind.Scale;
                 form.Close();
                 ShowGaugeParamSelectForm();
-            };
+            });
             form.Controls.Add(btnScale);
 
-            // BIPOLAR BUTTON
-            var btnBipolar = new Button
-            {
-                Text = "Bipolar gauge",
-                Width = previewSize,
-                Height = 36,
-                BackColor = Color.FromArgb(150, 200, 40),
-                ForeColor = Color.Black,
-                FlatStyle = FlatStyle.Flat
-            };
-            btnBipolar.FlatAppearance.BorderSize = 0;
-            btnBipolar.Location = new Point(col2, btnY);
-            btnBipolar.Click += (s, e) =>
+            // ============================================================
+            // ROW 1 — BIPOLAR
+            // ============================================================
+            var previewBipolar = CreateBipolarGauge("Preview", "preview_value", -10, 10);
+            previewBipolar.Enabled = false;
+            previewBipolar.Size = new Size(previewSize, previewSize);
+            previewBipolar.Value0 = 2;
+            previewBipolar.Location = new Point(col2, row1PreviewY);
+            form.Controls.Add(previewBipolar);
+
+            var btnBipolar = CreateGaugeButton("Bipolar gauge", col2, row1ButtonY, () =>
             {
                 _pendingGaugeKind = GaugeKind.Bipolar;
                 form.Close();
                 ShowGaugeParamSelectForm();
-            };
+            });
             form.Controls.Add(btnBipolar);
 
-            // CIRCULAR BUTTON
-            var btnCircular = new Button
-            {
-                Text = "Circular gauge",
-                Width = previewSize,
-                Height = 36,
-                BackColor = Color.FromArgb(150, 200, 40),
-                ForeColor = Color.Black,
-                FlatStyle = FlatStyle.Flat
-            };
-            btnCircular.FlatAppearance.BorderSize = 0;
-            btnCircular.Location = new Point(col3, btnY);
-            btnCircular.Click += (s, e) =>
+            // ============================================================
+            // ROW 1 — CIRCULAR
+            // ============================================================
+            var previewCircular = CreateCircularGauge("Preview", "preview_value", 0, 10);
+            previewCircular.Enabled = false;
+            previewCircular.Size = new Size(previewSize, previewSize);
+            previewCircular.Value0 = 4;
+            previewCircular.Location = new Point(col3, row1PreviewY);
+            form.Controls.Add(previewCircular);
+
+            var btnCircular = CreateGaugeButton("Circular gauge", col3, row1ButtonY, () =>
             {
                 _pendingGaugeKind = GaugeKind.Circular;
                 form.Close();
                 ShowGaugeParamSelectForm();
-            };
+            });
             form.Controls.Add(btnCircular);
 
-            // DIGITAL BUTTON
-            var btnDigital = new Button
-            {
-                Text = "Digital gauge",
-                Width = previewSize,
-                Height = 36,
-                BackColor = Color.FromArgb(150, 200, 40),
-                ForeColor = Color.Black,
-                FlatStyle = FlatStyle.Flat
-            };
-            btnDigital.FlatAppearance.BorderSize = 0;
-            btnDigital.Location = new Point(col4, btnY);
-            btnDigital.Click += (s, e) =>
+            // ============================================================
+            // ROW 2 — DIGITAL
+            // ============================================================
+            var previewDigital = CreateDigitalGauge("Preview", "preview_value", "00.00");
+            previewDigital.Enabled = true;
+            previewDigital.Size = new Size(previewSize, previewSize);
+            previewDigital.Location = new Point(col1, row2PreviewY);
+            form.Controls.Add(previewDigital);
+
+            var btnDigital = CreateGaugeButton("Digital gauge", col1, row2ButtonY, () =>
             {
                 _pendingGaugeKind = GaugeKind.Digital;
                 form.Close();
                 ShowGaugeParamSelectForm();
-            };
+            });
             form.Controls.Add(btnDigital);
 
-            // RANGES BUTTON
-            var btnRanges = new Button
-            {
-                Text = "Ranges gauge",
-                Width = previewSize,
-                Height = 36,
-                BackColor = Color.FromArgb(150, 200, 40),
-                ForeColor = Color.Black,
-                FlatStyle = FlatStyle.Flat
-            };
-            btnRanges.FlatAppearance.BorderSize = 0;
-            btnRanges.Location = new Point(col5, btnY);
-            btnRanges.Click += (s, e) =>
+            // ============================================================
+            // ROW 2 — RANGES
+            // ============================================================
+            var previewRanges = CreateRangesGauge("Preview", "preview_value", 0, 100);
+            previewRanges.Enabled = false;
+            previewRanges.Size = new Size(previewSize, previewSize);
+            previewRanges.Value0 = 75;
+            previewRanges.Location = new Point(col2, row2PreviewY);
+            form.Controls.Add(previewRanges);
+
+            var btnRanges = CreateGaugeButton("Ranges gauge", col2, row2ButtonY, () =>
             {
                 _pendingGaugeKind = GaugeKind.Ranges;
                 form.Close();
                 ShowGaugeParamSelectForm();
-            };
+            });
             form.Controls.Add(btnRanges);
 
             // ============================================================
-            // SHOW DIALOG
+            // ROW 2 — COMPASS
             // ============================================================
+            var previewCompass = CreateCompassGauge("Preview", "preview_value");
+            previewCompass.Enabled = false;
+            previewCompass.Size = new Size(previewSize, previewSize);
+            previewCompass.Value0 = 45;
+            previewCompass.Value1 = 120;
+            previewCompass.Location = new Point(col3, row2PreviewY);
+            form.Controls.Add(previewCompass);
+
+            var btnCompass = CreateGaugeButton(
+                "Compass",
+                col3,
+                row2ButtonY,
+                () =>
+                {
+                    _pendingGaugeKind = GaugeKind.Compass;
+                    form.Close(); // ❗ без ShowGaugeParamSelectForm
+                },
+                Color.FromArgb(255, 180, 40)
+            );
+            form.Controls.Add(btnCompass);
+
             form.ShowDialog(this);
         }
 
@@ -2216,11 +2285,13 @@ namespace MissionPlanner.GCSViews
                         break;
 
                     case GaugeKind.Ranges:
-                    g = CreateRangesGauge(caption, fieldName, 0, 100);
-                    break;
+                        g = CreateRangesGauge(caption, fieldName, 0, 100);
+                        break;
+                    case GaugeKind.Compass:                
+                        g = CreateCompassGauge(caption, fieldName);
+                        break;
                 }
                 
-
                 if (g != null)
                 {
                     _customGauges.Add(g);
