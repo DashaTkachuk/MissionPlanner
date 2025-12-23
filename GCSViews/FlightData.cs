@@ -783,22 +783,43 @@ namespace MissionPlanner.GCSViews
             };
         }
 
-        private void ScaleGauge_DoubleClick(object sender, EventArgs e)
+        private void Gauge_DoubleClick(object sender, EventArgs e)
         {
-            var oldGauge = sender as AGauge;
+            AGauge oldGauge = sender as AGauge;
             if (oldGauge == null)
                 return;
 
-            string max = oldGauge.MaxValue.ToString();
+            string minStr = oldGauge.MinValue.ToString();
+            string maxStr = oldGauge.MaxValue.ToString();
 
+            // ===== MIN =====
+            if (DialogResult.OK != InputBox.Show(
+                "Enter Min Value",
+                "Enter Min Value",
+                ref minStr))
+                return;
+
+            float newMin;
+            if (!float.TryParse(minStr, out newMin))
+                return;
+
+            // ===== MAX =====
             if (DialogResult.OK != InputBox.Show(
                 "Enter Max Value",
                 "Enter Max Value",
-                ref max))
+                ref maxStr))
                 return;
 
-            if (!float.TryParse(max, out float newMax))
+            float newMax;
+            if (!float.TryParse(maxStr, out newMax))
                 return;
+
+            if (newMax <= newMin)
+                return;
+
+            // ===== ЗБЕРІГАЄМО ПОЗИЦІЮ ТА РОЗМІР =====
+            Point oldLocation = oldGauge.Location;
+            Size  oldSize     = oldGauge.Size;
 
             string binding = oldGauge.Name.Replace("gauge_", "");
             string caption = oldGauge.CapText;
@@ -807,39 +828,49 @@ namespace MissionPlanner.GCSViews
 
             CurrentState.custom_field_names[binding] = caption;
 
+            GaugeKind kind = GaugeKind.Scale;
+            if (_customGaugeKinds.ContainsKey(binding))
+                kind = _customGaugeKinds[binding];
+
+            // ===== ВИДАЛЯЄМО СТАРИЙ =====
             _customGauges.Remove(oldGauge);
             tabGauges.Controls.Remove(oldGauge);
             oldGauge.Dispose();
 
-            var g = CreateScaleGauge(caption, binding, 0, newMax);
+            // ===== СТВОРЮЄМО НОВИЙ ТОГО Ж ТИПУ =====
+            AGauge g;
 
+            if (kind == GaugeKind.Scale)
+                g = CreateScaleGauge(caption, binding, newMin, newMax);
+            else if (kind == GaugeKind.Bipolar)
+                g = CreateBipolarGauge(caption, binding, newMin, newMax);
+            else if (kind == GaugeKind.Circular)
+                g = CreateCircularGauge(caption, binding, newMin, newMax);
+            else if (kind == GaugeKind.Ranges)
+                g = CreateRangesGauge(caption, binding, newMin, newMax);
+            else
+                g = CreateScaleGauge(caption, binding, newMin, newMax);
+
+            // ===== КРОК ШКАЛИ =====
+            float span = newMax - newMin;
             float step;
-            if (newMax <= 20) step = 2;
-            else if (newMax <= 50) step = 5;
-            else if (newMax <= 100) step = 10;
-            else if (newMax <= 200) step = 20;
-            else if (newMax <= 500) step = 50;
-            else if (newMax <= 1000) step = 100;
-            else if (newMax <= 2000) step = 200;
-            else if (newMax <= 5000) step = 500;
-            else step = 1000;
+
+            if (span <= 20) step = 2;
+            else if (span <= 50) step = 5;
+            else if (span <= 100) step = 10;
+            else if (span <= 200) step = 20;
+            else if (span <= 500) step = 50;
+            else if (span <= 1000) step = 100;
+            else if (span <= 2000) step = 200;
+            else step = span / 10f;
 
             g.ScaleLinesMajorStepValue = step;
             g.ScaleLinesMinorNumOf = 10;
+            g.ScaleNumbersStepScaleLines = (span > 100) ? 2 : 1;
 
-            // int arc = g.BaseArcRadius;
-
-            // if (newMax <= 1000)
-            //     g.ScaleNumbersRadius = arc - 20;
-            // else if (newMax <= 5000)
-            //     g.ScaleNumbersRadius = arc - 16;
-            // else
-            //     g.ScaleNumbersRadius = arc - 12;
-
-            // g.ScaleLinesMajorInnerRadius = arc - 22;
-            // g.ScaleLinesMajorOuterRadius = arc - 6;
-            // g.ScaleLinesMinorInnerRadius = arc - 16;
-            // g.ScaleLinesMinorOuterRadius = arc - 6;
+            // ===== ПОВЕРТАЄМО НА ТЕ САМЕ МІСЦЕ =====
+            g.Location = oldLocation;
+            g.Size     = oldSize;
 
             if (index >= 0 && index <= _customGauges.Count)
                 _customGauges.Insert(index, g);
@@ -847,10 +878,9 @@ namespace MissionPlanner.GCSViews
                 _customGauges.Add(g);
 
             tabGauges.Controls.Add(g);
-            tabGauges.Controls.SetChildIndex(g, index); 
+            tabGauges.Controls.SetChildIndex(g, index);
 
-            tabPage1_Resize(tabGauges, EventArgs.Empty);
-
+            Settings.Instance[g.Name + "_MIN"]  = newMin.ToString();
             Settings.Instance[g.Name + "_MAX"]  = newMax.ToString();
             Settings.Instance[g.Name + "_STEP"] = step.ToString();
         }
@@ -1028,7 +1058,7 @@ namespace MissionPlanner.GCSViews
                 _customGauges.Add(g);
             }
 
-            g.DoubleClick += ScaleGauge_DoubleClick;
+            g.DoubleClick += Gauge_DoubleClick;
 
             return g;
         }
@@ -1214,6 +1244,8 @@ namespace MissionPlanner.GCSViews
                 _customGauges.Add(g);
             }
 
+            g.DoubleClick += Gauge_DoubleClick;
+
             return g;
         }
 
@@ -1312,7 +1344,7 @@ namespace MissionPlanner.GCSViews
                 Color.White
             };
 
-             g.NeedleType = 0;
+            g.NeedleType = 0;
             g.NeedleWidth = 2;
 
             // ============================================================
@@ -1426,6 +1458,8 @@ namespace MissionPlanner.GCSViews
                 _customGaugeKinds[bindingProperty] = GaugeKind.Circular;
                 _customGauges.Add(g);
             }
+
+            g.DoubleClick += Gauge_DoubleClick;
 
             return g;
         }
@@ -1816,11 +1850,11 @@ namespace MissionPlanner.GCSViews
 
             if (bindingProperty != "preview_value")
             {
-                _customGaugeKinds[bindingProperty] = GaugeKind.Scale;
+                _customGaugeKinds[bindingProperty] = GaugeKind.Ranges;
                 _customGauges.Add(g);
             }
 
-            g.DoubleClick += ScaleGauge_DoubleClick;
+            g.DoubleClick += Gauge_DoubleClick;
 
             return g;
         }
@@ -2239,7 +2273,6 @@ namespace MissionPlanner.GCSViews
 
             tabPage1_Resize(tabGauges, EventArgs.Empty);
         }
-
 
         private void tabPage1_Resize(object sender, EventArgs e)
         {
