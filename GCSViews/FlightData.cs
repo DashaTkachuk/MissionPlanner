@@ -735,7 +735,6 @@ namespace MissionPlanner.GCSViews
             Circular, // круговий 
             Digital,  // цифровий
             Ranges,   // зонний
-            Compass   // компас 
         }
 
         private readonly Dictionary<string, GaugeKind> _customGaugeKinds =
@@ -1826,83 +1825,7 @@ namespace MissionPlanner.GCSViews
             return g;
         }
 
-        private AGauge CreateCompassGauge(string caption, string bindingProperty)
-        {
-            var g = new AGauge();
-
-            g.BackColor = Color.Transparent;
-            g.Size = new Size(150, 150);
-            g.MinimumSize = new Size(150, 150);
-            g.Center = new Point(75, 75);
-
-            g.BaseArcColor = Color.Transparent;
-            g.BaseArcRadius = 60;
-            g.BaseArcStart = 270;
-            g.BaseArcSweep = 360;
-            g.BaseArcWidth = 2;
-
-            // ===== SCALE =====
-            g.MinValue = 0;
-            g.MaxValue = 360;
-
-            g.ScaleLinesMajorColor = Color.White;
-            g.ScaleLinesMajorInnerRadius = 50;
-            g.ScaleLinesMajorOuterRadius = 60;
-            g.ScaleLinesMajorStepValue = 30f;
-            g.ScaleLinesMajorWidth = 2;
-
-            g.ScaleLinesMinorColor = Color.White;
-            g.ScaleLinesMinorInnerRadius = 55;
-            g.ScaleLinesMinorOuterRadius = 60;
-            g.ScaleLinesMinorNumOf = 5;
-            g.ScaleLinesMinorWidth = 1;
-
-            g.ScaleNumbersColor = Color.White;
-            g.ScaleNumbersRadius = 42;
-            g.ScaleNumbersRotation = 0;
-            g.ScaleNumbersStartScaleLine = 0;
-            g.ScaleNumbersStepScaleLines = 1;
-
-            // ===== NEEDLES =====
-            g.NeedleEnabled = false;
-            g.Need_Idx = 3;
-
-            g.NeedlesEnabled = new[] { true, true, true, true };
-            g.NeedlesRadius  = new[] { 0, 58, 14, 14 };
-            g.NeedlesWidth   = new[] { 0, 3, 3, 3 };
-            g.NeedlesType    = new[] { 0, 0, 0, 0 };
-
-            g.NeedlesColor1 = new[]
-            {
-                AGauge.NeedleColorEnum.Gray,
-                AGauge.NeedleColorEnum.Red,
-                AGauge.NeedleColorEnum.Red,
-                AGauge.NeedleColorEnum.Red
-            };
-
-            g.RangeEnabled = false;
-            g.RangesEnabled = new bool[] { false, false, false, false, false };
-
-            bool isPreview = bindingProperty == "preview_value";
-            if (!isPreview)
-            {
-                g.DataBindings.Add(new Binding("Value0", bindingSourceGaugesTab, "yaw", true));
-                g.DataBindings.Add(new Binding("Value1", bindingSourceGaugesTab, "nav_bearing", true));
-            }
-
-            g.Value2 = 90;
-            g.Value3 = 0;
-
-            g.Name = "compass_" + bindingProperty;
-
-            if (!isPreview)
-            {
-                _customGaugeKinds[bindingProperty] = GaugeKind.Compass;
-                _customGauges.Add(g);
-            }
-
-            return g;
-        }
+        private MissionPlanner.Controls.HSI _customHeading;
 
        void AddCustomGaugeItem(string fieldName, string caption)
         {
@@ -1933,10 +1856,6 @@ namespace MissionPlanner.GCSViews
              else if (_pendingGaugeKind == GaugeKind.Ranges)
             {
                 g = CreateRangesGauge(caption, fieldName, 0, 100);
-            }
-            else if (_pendingGaugeKind == GaugeKind.Compass)
-            {
-                g = CreateCompassGauge(caption, fieldName);
             }
 
             if (g != null)
@@ -2131,11 +2050,16 @@ namespace MissionPlanner.GCSViews
             // ============================================================
             // ROW 2 — COMPASS
             // ============================================================
-            var previewCompass = CreateCompassGauge("Preview", "preview_value");
+            var previewCompass = new MissionPlanner.Controls.HSI();
             previewCompass.Enabled = false;
             previewCompass.Size = new Size(previewSize, previewSize);
-            previewCompass.Value0 = 45;
-            previewCompass.Value1 = 120;
+
+            previewCompass.BackColor = Color.Black;
+            previewCompass.ForeColor = Color.White;
+
+            previewCompass.Heading = 45;
+            previewCompass.NavHeading = 120;
+
             previewCompass.Location = new Point(col3, row2PreviewY);
             form.Controls.Add(previewCompass);
 
@@ -2145,11 +2069,28 @@ namespace MissionPlanner.GCSViews
                 row2ButtonY,
                 () =>
                 {
-                    _pendingGaugeKind = GaugeKind.Compass;
-                    form.Close(); // ❗ без ShowGaugeParamSelectForm
+                    if (_customHeading != null)
+                        return;
+
+                    _customHeading = new MissionPlanner.Controls.HSI();
+                    _customHeading.Size = new Size(150, 150);
+
+                    _customHeading.BackColor = Color.Black;
+                    _customHeading.ForeColor = Color.White;
+
+                    _customHeading.DataBindings.Add(
+                        new Binding("Heading", bindingSourceGaugesTab, "yaw", true));
+                    _customHeading.DataBindings.Add(
+                        new Binding("NavHeading", bindingSourceGaugesTab, "nav_bearing", true));
+
+                    tabGauges.Controls.Add(_customHeading);
+                    tabPage1_Resize(tabGauges, EventArgs.Empty);
+
+                    form.Close();
                 },
                 Color.FromArgb(255, 180, 40)
             );
+
             form.Controls.Add(btnCompass);
 
             form.ShowDialog(this);
@@ -2287,11 +2228,8 @@ namespace MissionPlanner.GCSViews
                     case GaugeKind.Ranges:
                         g = CreateRangesGauge(caption, fieldName, 0, 100);
                         break;
-                    case GaugeKind.Compass:                
-                        g = CreateCompassGauge(caption, fieldName);
-                        break;
                 }
-                
+
                 if (g != null)
                 {
                     _customGauges.Add(g);
@@ -2305,19 +2243,14 @@ namespace MissionPlanner.GCSViews
 
         private void tabPage1_Resize(object sender, EventArgs e)
         {
-            int mysize;
-
             Control tabGauges = sender as Control;
-            if (tabGauges == null) return;
-
-            float scale = tabGauges.Width / (float)tabGauges.Height;
+            if (tabGauges == null)
+                return;
 
             var allGauges = new List<Control>();
 
-            if (Gvspeed != null)   allGauges.Add(Gvspeed);
-            if (Gspeed != null)   allGauges.Add(Gspeed);
-            if (Galt != null)     allGauges.Add(Galt);
-            if (Gheading != null) allGauges.Add(Gheading);
+            if (_customHeading != null)
+                allGauges.Add(_customHeading);
 
             allGauges.AddRange(
                 _customGauges
@@ -2328,38 +2261,33 @@ namespace MissionPlanner.GCSViews
             if (allGauges.Count == 0)
                 return;
 
-            if (scale > 0.5 && scale < 1.9)
-            {
-                if (tabGauges.Height < tabGauges.Width)
-                    mysize = tabGauges.Height / 2;
-                else
-                    mysize = tabGauges.Width / 2;
-            }
-            else
-            {
-                if (tabGauges.Width < 500)
-                    mysize = tabGauges.Width / 3;
-                else
-                    mysize = tabGauges.Width / 4;
-            }
+            int count = allGauges.Count;
 
-            foreach (var g in _customGauges)
+            int columns;
+
+            if (count <= 4)       columns = 2;
+            else if (count <= 6)  columns = 3;
+            else if (count <= 9)  columns = 3;
+            else if (count <= 12) columns = 4;
+            else if (count <= 16) columns = 4;
+            else                  columns = 5;   // 17+
+
+            int mysize = tabGauges.Width / columns;
+
+            mysize = Math.Max(110, mysize);
+
+            foreach (var g in allGauges)
             {
-                if (g != null && g.Parent != tabGauges)
+                if (g.Parent != tabGauges)
                     tabGauges.Controls.Add(g);
             }
 
             int x = 0;
             int y = 0;
+            int col = 0;
 
             foreach (var g in allGauges)
             {
-                if (x + mysize > tabGauges.Width)
-                {
-                    x = 0;
-                    y += mysize;
-                }
-
                 g.Width  = mysize;
                 g.Height = mysize;
                 g.Location = new Point(x, y);
@@ -2379,7 +2307,15 @@ namespace MissionPlanner.GCSViews
                     }
                 }
 
+                col++;
                 x += mysize;
+
+                if (col >= columns)
+                {
+                    col = 0;
+                    x = 0;
+                    y += mysize;
+                }
             }
         }
 
