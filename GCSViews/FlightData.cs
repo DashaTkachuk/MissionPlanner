@@ -243,7 +243,8 @@ namespace MissionPlanner.GCSViews
 
             InitializeComponent();
             InitGaugesContextMenu(); 
-
+            InitDefaultGauges();
+            
             log.Info("Components Done");
 
             instance = this;
@@ -872,13 +873,7 @@ namespace MissionPlanner.GCSViews
             g.Location = oldLocation;
             g.Size     = oldSize;
 
-            if (index >= 0 && index <= _customGauges.Count)
-                _customGauges.Insert(index, g);
-            else
-                _customGauges.Add(g);
-
-            tabGauges.Controls.Add(g);
-            tabGauges.Controls.SetChildIndex(g, index);
+            _customGauges.Add(g);
 
             Settings.Instance[g.Name + "_MIN"]  = newMin.ToString();
             Settings.Instance[g.Name + "_MAX"]  = newMax.ToString();
@@ -1055,7 +1050,7 @@ namespace MissionPlanner.GCSViews
             if (bindingProperty != "preview_value")
             {
                 _customGaugeKinds[bindingProperty] = GaugeKind.Scale;
-                _customGauges.Add(g);
+                // _customGauges.Add(g);
             }
 
             g.DoubleClick += Gauge_DoubleClick;
@@ -1241,7 +1236,6 @@ namespace MissionPlanner.GCSViews
             if (bindingProperty != "preview_value")
             {
                 _customGaugeKinds[bindingProperty] = GaugeKind.Bipolar;
-                _customGauges.Add(g);
             }
 
             g.DoubleClick += Gauge_DoubleClick;
@@ -1264,7 +1258,7 @@ namespace MissionPlanner.GCSViews
             // ===== ОСНОВНА ДУГА =====
             g.BaseArcColor = Color.Transparent;
             g.BaseArcRadius = 60;
-            g.BaseArcStart = 270;   // 0 вгорі
+            g.BaseArcStart = 270;   
             g.BaseArcSweep = 360;
             g.BaseArcWidth = 2;
 
@@ -1456,7 +1450,6 @@ namespace MissionPlanner.GCSViews
             if (!isPreview)
             {
                 _customGaugeKinds[bindingProperty] = GaugeKind.Circular;
-                _customGauges.Add(g);
             }
 
             g.DoubleClick += Gauge_DoubleClick;
@@ -1633,7 +1626,6 @@ namespace MissionPlanner.GCSViews
             if (!isPreview)
             {
                 _customGaugeKinds[bindingProperty] = GaugeKind.Digital;
-                _customGauges.Add(g);
             }
 
             return g;
@@ -1851,8 +1843,363 @@ namespace MissionPlanner.GCSViews
             if (bindingProperty != "preview_value")
             {
                 _customGaugeKinds[bindingProperty] = GaugeKind.Ranges;
-                _customGauges.Add(g);
             }
+
+            g.DoubleClick += Gauge_DoubleClick;
+
+            return g;
+        }
+
+        private AGauge CreateCylinderTempGauge(
+            string caption,
+            string bindingProperty)
+        {
+            var g = new AGauge();
+
+            g.BackColor = Color.Transparent;
+            g.Size = new Size(150, 150);
+            g.MinimumSize = new Size(150, 150);
+
+            // =========================
+            // ОСНОВНА ДУГА
+            // =========================
+            g.BaseArcColor = Color.Transparent;
+            g.BaseArcRadius = 70;
+            g.BaseArcStart = 135;
+            g.BaseArcSweep = 270;
+            g.BaseArcWidth = 2;
+            g.Center = new Point(75, 75);
+
+            // =========================
+            // ПІДПИС
+            // =========================
+            g.Cap_Idx = 0;
+            g.CapColor = Color.White;
+            g.CapText = caption;
+            g.CapsText = new string[] { caption, "", "", "", "" };
+            g.CapColors = new Color[]
+            {
+                Color.White, Color.White,
+                Color.Black, Color.Black, Color.Black
+            };
+
+            int textWidth = (int)g.CreateGraphics()
+                .MeasureString(caption, g.Font).Width;
+
+            int capX = g.Center.X - textWidth / 2;
+            int capY = g.Center.Y + 8;
+
+            g.CapPosition = new Point(capX, capY);
+            g.CapsPosition = new Point[]
+            {
+                new Point(capX, capY),
+                new Point(capX, capY + 16),
+                Point.Empty,
+                Point.Empty,
+                Point.Empty
+            };
+
+            // =========================
+            // СТРІЛКИ
+            // =========================
+            g.Need_Idx = 3;
+            g.NeedleEnabled = false;
+            g.NeedleRadius = 70;
+
+            g.NeedlesEnabled = new bool[] { true, true, false, false };
+            g.NeedlesColor1 = new AGauge.NeedleColorEnum[]
+            {
+                AGauge.NeedleColorEnum.Gray,
+                AGauge.NeedleColorEnum.Red,
+                AGauge.NeedleColorEnum.Blue,
+                AGauge.NeedleColorEnum.Gray
+            };
+
+            g.NeedlesColor2 = new Color[]
+            {
+                Color.White,
+                Color.White,
+                Color.White,
+                Color.Brown
+            };
+
+            g.NeedlesRadius = new int[] { 50, 50, 70, 70 };
+            g.NeedlesType   = new int[] { 0, 0, 0, 0 };
+            g.NeedlesWidth  = new int[] { 2, 1, 2, 2 };
+
+            g.NeedleType = 0;
+            g.NeedleWidth = 2;
+
+            // =========================
+            // ШКАЛА
+            // =========================
+            g.ScaleLinesInterColor = Color.White;
+            g.ScaleLinesInterInnerRadius = 52;
+            g.ScaleLinesInterOuterRadius = 60;
+            g.ScaleLinesInterWidth = 1;
+
+            g.ScaleLinesMajorColor = Color.White;
+            g.ScaleLinesMajorInnerRadius = 50;
+            g.ScaleLinesMajorOuterRadius = 60;
+            g.ScaleLinesMajorWidth = 2;
+
+            g.ScaleLinesMinorColor = Color.White;
+            g.ScaleLinesMinorInnerRadius = 55;
+            g.ScaleLinesMinorOuterRadius = 60;
+            g.ScaleLinesMinorWidth = 1;
+
+            g.ScaleNumbersColor = Color.White;
+            g.ScaleNumbersRadius = 42;
+
+            // =========================
+            // МІН / МАКС
+            // =========================
+            g.MinValue = -10;
+            g.MaxValue = 200;
+
+            g.ScaleLinesMajorStepValue = 20;
+            g.ScaleLinesMinorNumOf = 10;
+
+            // =========================
+            // КОЛЬОРОВІ ЗОНИ
+            // =========================
+            g.RangeEnabled = true;
+
+            g.RangesEnabled = new bool[]
+            {
+                true, true, true, true, false
+            };
+
+            g.RangesColor = new Color[]
+            {
+                Color.DeepSkyBlue,
+                Color.LimeGreen,
+                Color.Orange,
+                Color.Red,
+                Color.Transparent
+            };
+
+            g.RangesStartValue = new float[] { -10, 81, 141, 161, 0 };
+            g.RangesEndValue   = new float[] { 80, 140, 160, 200, 0 };
+
+            g.RangesInnerRadius = new int[] { 62, 62, 62, 62, 0 };
+            g.RangesOuterRadius = new int[] { 68, 68, 68, 68, 0 };
+
+            // =========================
+            // DATA BINDING
+            // =========================
+            if (bindingProperty != "preview_value")
+            {
+                try
+                {
+                    g.DataBindings.Add(
+                        new Binding("Value0", bindingSourceGaugesTab, bindingProperty, true)
+                    );
+                }
+                catch { }
+            }
+
+            g.Value0 = 0f;
+
+            // =========================
+            // CONTEXT MENU
+            // =========================
+            var cm = new ContextMenuStrip();
+            cm.Items.Add("Delete gauge", null, (s, e) =>
+            {
+                _customGauges.Remove(g);
+                _customGaugeKinds.Remove(bindingProperty);
+
+                if (CurrentState.custom_field_names.ContainsKey(bindingProperty))
+                    CurrentState.custom_field_names.Remove(bindingProperty);
+
+                g.Parent?.Controls.Remove(g);
+                g.Dispose();
+                tabPage1_Resize(tabGauges, EventArgs.Empty);
+            });
+
+            g.ContextMenuStrip = cm;
+            g.Name = "gauge_" + bindingProperty;
+
+            _customGaugeKinds[bindingProperty] = GaugeKind.Ranges;
+
+            g.DoubleClick += Gauge_DoubleClick;
+
+            return g;
+        }
+
+        private AGauge CreateCarbTempGauge(
+            string caption,
+            string bindingProperty)
+        {
+            var g = new AGauge();
+
+            g.BackColor = Color.Transparent;
+            g.Size = new Size(150, 150);
+            g.MinimumSize = new Size(150, 150);
+
+            // =========================
+            // ОСНОВНА ДУГА
+            // =========================
+            g.BaseArcColor = Color.Transparent;
+            g.BaseArcRadius = 70;
+            g.BaseArcStart = 135;
+            g.BaseArcSweep = 270;
+            g.BaseArcWidth = 2;
+            g.Center = new Point(75, 75);
+
+            // =========================
+            // ПІДПИС
+            // =========================
+            g.Cap_Idx = 0;
+            g.CapColor = Color.White;
+            g.CapText = caption;
+            g.CapsText = new string[] { caption, "", "", "", "" };
+            g.CapColors = new Color[]
+            {
+                Color.White, Color.White,
+                Color.Black, Color.Black, Color.Black
+            };
+
+            int textWidth = (int)g.CreateGraphics()
+                .MeasureString(caption, g.Font).Width;
+
+            int capX = g.Center.X - textWidth / 2;
+            int capY = g.Center.Y + 8;
+
+            g.CapPosition = new Point(capX, capY);
+            g.CapsPosition = new Point[]
+            {
+                new Point(capX, capY),
+                new Point(capX, capY + 16),
+                Point.Empty,
+                Point.Empty,
+                Point.Empty
+            };
+
+            // =========================
+            // СТРІЛКИ
+            // =========================
+            g.Need_Idx = 3;
+            g.NeedleEnabled = false;
+            g.NeedleRadius = 70;
+
+            g.NeedlesEnabled = new bool[] { true, true, false, false };
+            g.NeedlesColor1 = new AGauge.NeedleColorEnum[]
+            {
+                AGauge.NeedleColorEnum.Gray,
+                AGauge.NeedleColorEnum.Red,
+                AGauge.NeedleColorEnum.Blue,
+                AGauge.NeedleColorEnum.Gray
+            };
+
+            g.NeedlesColor2 = new Color[]
+            {
+                Color.White,
+                Color.White,
+                Color.White,
+                Color.Brown
+            };
+
+            g.NeedlesRadius = new int[] { 50, 50, 70, 70 };
+            g.NeedlesType   = new int[] { 0, 0, 0, 0 };
+            g.NeedlesWidth  = new int[] { 2, 1, 2, 2 };
+
+            g.NeedleType = 0;
+            g.NeedleWidth = 2;
+
+            // =========================
+            // ШКАЛА
+            // =========================
+            g.ScaleLinesInterColor = Color.White;
+            g.ScaleLinesInterInnerRadius = 52;
+            g.ScaleLinesInterOuterRadius = 60;
+            g.ScaleLinesInterWidth = 1;
+
+            g.ScaleLinesMajorColor = Color.White;
+            g.ScaleLinesMajorInnerRadius = 50;
+            g.ScaleLinesMajorOuterRadius = 60;
+            g.ScaleLinesMajorWidth = 2;
+
+            g.ScaleLinesMinorColor = Color.White;
+            g.ScaleLinesMinorInnerRadius = 55;
+            g.ScaleLinesMinorOuterRadius = 60;
+            g.ScaleLinesMinorWidth = 1;
+
+            g.ScaleNumbersColor = Color.White;
+            g.ScaleNumbersRadius = 42;
+
+            // =========================
+            // МІН / МАКС
+            // =========================
+            g.MinValue = -10;
+            g.MaxValue = 60;
+
+            g.ScaleLinesMajorStepValue = 10;
+            g.ScaleLinesMinorNumOf = 10;
+
+            // =========================
+            // КОЛЬОРОВІ ЗОНИ
+            // =========================
+            g.RangeEnabled = true;
+
+            g.RangesEnabled = new bool[]
+            {
+                true, true, true, false, false
+            };
+
+            g.RangesColor = new Color[]
+            {
+                Color.DeepSkyBlue,
+                Color.LimeGreen,
+                Color.Red,
+                Color.Transparent,
+                Color.Transparent
+            };
+
+            g.RangesStartValue = new float[] { -10, 6, 31, 0, 0 };
+            g.RangesEndValue   = new float[] { 5, 30, 60, 0, 0 };
+
+            g.RangesInnerRadius = new int[] { 62, 62, 62, 0, 0 };
+            g.RangesOuterRadius = new int[] { 68, 68, 68, 0, 0 };
+
+            // =========================
+            // DATA BINDING
+            // =========================
+            if (bindingProperty != "preview_value")
+            {
+                try
+                {
+                    g.DataBindings.Add(
+                        new Binding("Value0", bindingSourceGaugesTab, bindingProperty, true)
+                    );
+                }
+                catch { }
+            }
+
+            g.Value0 = 0f;
+
+            // =========================
+            // CONTEXT MENU
+            // =========================
+            var cm = new ContextMenuStrip();
+            cm.Items.Add("Delete gauge", null, (s, e) =>
+            {
+                _customGauges.Remove(g);
+                _customGaugeKinds.Remove(bindingProperty);
+
+                if (CurrentState.custom_field_names.ContainsKey(bindingProperty))
+                    CurrentState.custom_field_names.Remove(bindingProperty);
+
+                g.Parent?.Controls.Remove(g);
+                g.Dispose();
+                tabPage1_Resize(tabGauges, EventArgs.Empty);
+            });
+
+            g.ContextMenuStrip = cm;
+            g.Name = "gauge_" + bindingProperty;
+
+            _customGaugeKinds[bindingProperty] = GaugeKind.Ranges;
 
             g.DoubleClick += Gauge_DoubleClick;
 
@@ -1894,8 +2241,8 @@ namespace MissionPlanner.GCSViews
 
             if (g != null)
             {
-                tabGauges.Controls.Add(g);
-                tabPage1_Resize(tabGauges, EventArgs.Empty);
+                _customGauges.Add(g);
+               RebuildCustomGaugesFromSelection();
             }
         }
 
@@ -2274,6 +2621,130 @@ namespace MissionPlanner.GCSViews
             tabPage1_Resize(tabGauges, EventArgs.Empty);
         }
 
+        private void InitDefaultGauges()
+        {
+            CurrentState.custom_field_names = new Dictionary<string, string>();
+
+            // ---------- COMPASS ----------
+            if (_customHeading == null)
+            {
+                _customHeading = new MissionPlanner.Controls.HSI
+                {
+                    Size = new Size(150, 150),
+                    BackColor = Color.Black,
+                    ForeColor = Color.White
+                };
+
+                _customHeading.DataBindings.Add(
+                    new Binding("Heading", bindingSourceGaugesTab, "yaw", true));
+                _customHeading.DataBindings.Add(
+                    new Binding("NavHeading", bindingSourceGaugesTab, "nav_bearing", true));
+
+                tabGauges.Controls.Add(_customHeading);
+            }
+
+            void AddGauge(string field, string caption, GaugeKind kind, AGauge g)
+            {
+                if (g == null) return;
+
+                CurrentState.custom_field_names[field] = caption;
+                _customGaugeKinds[field] = kind;
+                _customGauges.Add(g);
+                tabGauges.Controls.Add(g);
+            }
+
+            // 2. Altitude
+            AddGauge("altitude", "Висота",
+                GaugeKind.Scale,
+                CreateScaleGauge("Висота", "altitude", 0, 10));
+
+            // 3. Airspeed
+            AddGauge("airspeed", "Пов. швидкість",
+                GaugeKind.Scale,
+                CreateScaleGauge("Пов. швидкість", "airspeed", 0, 200));
+
+            // 4. VSI
+            AddGauge("verticalspeed", "VSI",
+                GaugeKind.Bipolar,
+                CreateBipolarGauge("VSI", "verticalspeed", -10, 10));
+
+            // 5. Time in air
+            AddGauge("timeInAirMinSec", "Час польоту",
+                GaugeKind.Digital,
+                CreateDigitalGauge("Час польоту", "timeInAirMinSec", "00:00"));
+
+            // 6. Cylinders MAV_TEMP 1–8
+            for (int i = 1; i <= 8; i++)
+            {
+                string f = $"MAV_TEMP{i}";
+                AddGauge(f, $"Циліндр {i}",
+                    GaugeKind.Ranges,
+                    CreateCylinderTempGauge($"Циліндр {i}", f));
+            }
+
+            // 7. Carburetors MAV_TEMP 9–12
+            for (int i = 9; i <= 12; i++)
+            {
+                string f = $"MAV_TEMP{i}";
+                AddGauge(f, $"Карбюратор {i - 8}",
+                    GaugeKind.Ranges,
+                    CreateCarbTempGauge($"Карбюратор {i - 8}", f));
+            }
+
+            // 8. RPM
+            AddGauge("MAV_RPM", "Оберти",
+                GaugeKind.Scale,
+                CreateScaleGauge("Оберти", "MAV_RPM", 0, 10000));
+
+            // 9. GPS Speed
+            AddGauge("groundspeed", "GPS швидкість",
+                GaugeKind.Scale,
+                CreateScaleGauge("GPS швидкість", "groundspeed", 0, 200));
+
+            // 10. Distance traveled
+            AddGauge("distTraveled", "Дистанція",
+                GaugeKind.Digital,
+                CreateDigitalGauge("Дистанція", "distTraveled", "0.0"));
+
+            // 11. Distance to home
+            AddGauge("distToHome", "Відстань",
+                GaugeKind.Digital,
+                CreateDigitalGauge("Відстань", "distToHome", "0.0"));
+
+            // 12. Pitch
+            {
+                var g = CreateBipolarGauge("Pitch", "pitch", -90, 90);
+
+                g.ScaleLinesMajorStepValue = 15; 
+
+                AddGauge("pitch", "Pitch", GaugeKind.Bipolar, g);
+            }
+
+            // 13. Roll
+            {
+                var g = CreateBipolarGauge("Roll", "roll", -90, 90);
+
+                g.ScaleLinesMajorStepValue = 15;
+
+                AddGauge("roll", "Roll", GaugeKind.Bipolar, g);
+            }
+
+            // 14. Yaw
+            {
+                var g = CreateBipolarGauge("Yaw", "yaw", -90, 90);
+
+                g.ScaleLinesMajorStepValue = 15;   
+
+                AddGauge("yaw", "Yaw", GaugeKind.Bipolar, g);
+            }
+
+            // 15. Satellites
+            AddGauge("satCount", "Супутники",
+                GaugeKind.Digital,
+                CreateDigitalGauge("Супутники", "satCount", "0"));
+        }
+
+
         private void tabPage1_Resize(object sender, EventArgs e)
         {
             Control tabGauges = sender as Control;
@@ -2307,13 +2778,7 @@ namespace MissionPlanner.GCSViews
 
             int mysize = tabGauges.Width / columns;
 
-            mysize = Math.Max(110, mysize);
-
-            foreach (var g in allGauges)
-            {
-                if (g.Parent != tabGauges)
-                    tabGauges.Controls.Add(g);
-            }
+            mysize = Math.Max(80, mysize);
 
             int x = 0;
             int y = 0;
